@@ -112,43 +112,11 @@ export async function ensureEffectiveRuleDefinition(admin: AdminClient) {
   if (errors.length && !onlyAlreadyExists) assertNoUserErrors(errors);
 }
 
-export async function ensureStorefrontConfigDefinition(admin: AdminClient) {
-  const data = await graphql<{
-    metafieldDefinitionCreate: {
-      createdDefinition: { id: string } | null;
-      userErrors: Array<{ message: string; code?: string }>;
-    };
-  }>(
-    admin,
-    `#graphql
-      mutation CreateStorefrontConfigDefinition($definition: MetafieldDefinitionInput!) {
-        metafieldDefinitionCreate(definition: $definition) {
-          createdDefinition { id }
-          userErrors { code message }
-        }
-      }
-    `,
-    {
-      definition: {
-        namespace: NAMESPACE,
-        key: STOREFRONT_CONFIGURATION_KEY,
-        name: "Storefront quantity configuration",
-        description:
-          "Compiled storefront quantity rules managed by Min Max Order Limits.",
-        type: "json",
-        ownerType: "APP",
-        access: { storefront: "PUBLIC_READ" },
-      },
-    },
-  );
-
-  const errors = data.metafieldDefinitionCreate.userErrors;
-  const onlyAlreadyExists =
-    errors.length > 0 &&
-    errors.every((error) =>
-      /already exists|taken|in use/i.test(`${error.code || ""} ${error.message}`),
-    );
-  if (errors.length && !onlyAlreadyExists) assertNoUserErrors(errors);
+export async function ensureStorefrontConfigDefinition() {
+  // App-installation metafields are read by the theme extension via Liquid's
+  // `app.metafields`, not the Storefront API, so no PUBLIC_READ definition is
+  // needed. The `APP` owner type is not a valid MetafieldDefinitionInput
+  // ownerType, so we intentionally do not create a definition here.
 }
 
 export async function ensureValidation(
