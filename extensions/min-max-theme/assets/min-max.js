@@ -18,6 +18,7 @@
   const locale = (document.documentElement.lang || "en").toLowerCase().split("-")[0];
 
   const ruleFor = (variantId) => {
+    if (!variantId) return null;
     const id = String(variantId).split("/").pop();
     return rules[id] || null;
   };
@@ -51,6 +52,7 @@
   };
 
   const snapToValid = (quantity, rule) => {
+    if (!Number.isFinite(quantity)) return rule.start;
     if (quantity < rule.minimum) return rule.start;
     if (rule.maximum != null && quantity > rule.maximum) return rule.maximum;
     const remainder = quantity % rule.increment;
@@ -80,32 +82,47 @@
     showMessage(input, rule, !valid(Number(input.value), rule));
   };
 
-  const productForms = () => {
-    document.querySelectorAll('form[action*="/cart/add"]').forEach((form) => {
-      const variantInput = form.querySelector('input[name="id"], select[name="id"]');
-      if (!variantInput) return;
-      const variantId = variantInput.value;
-      const rule = ruleFor(variantId);
-      if (!rule) return;
-      let quantityInput = form.querySelector('input[name="quantity"]');
-      if (quantityInput) configureInput(quantityInput, variantId, true);
-      form.dataset.minMaxVariantId = String(variantId);
-    });
+  // Find the variant ID for a given quantity input by looking at:
+  // 1. data-quantity-variant-id / data-cart-item-variant-id (cart)
+  // 2. The form it belongs to (via form attribute or closest form)
+  const variantIdForInput = (input) => {
+    if (input.dataset.quantityVariantId) return input.dataset.quantityVariantId;
+    if (input.dataset.cartItemVariantId) return input.dataset.cartItemVariantId;
+    if (input.dataset.minMaxVariantId) return input.dataset.minMaxVariantId;
+    const formId = input.getAttribute("form");
+    const form = formId
+      ? document.getElementById(formId)
+      : input.closest("form");
+    if (!form) return null;
+    const variantInput = form.querySelector('input[name="id"], select[name="id"]');
+    return variantInput?.value || form.dataset.minMaxVariantId || null;
   };
 
-  const cartInputs = () => {
+  // Configure ALL quantity inputs on the page — product forms, cart, etc.
+  const apply = () => {
+    // Product page: inputs with name="quantity" linked to /cart/add forms
+    document.querySelectorAll('input[name="quantity"]').forEach((input) => {
+      const variantId = variantIdForInput(input);
+      const rule = ruleFor(variantId);
+      if (!rule) return;
+      // Only initialize (set start value) on product pages, not cart
+      const isProductForm = input.getAttribute("form") || input.closest('form[action*="/cart/add"]');
+      configureInput(input, variantId, Boolean(isProductForm));
+    });
+
+    // Cart page: inputs with data-quantity-variant-id or data-cart-item-variant-id
     document
       .querySelectorAll("input[data-quantity-variant-id], input[data-cart-item-variant-id]")
       .forEach((input) => {
-        const variantId =
-          input.dataset.quantityVariantId || input.dataset.cartItemVariantId;
+        const variantId = input.dataset.quantityVariantId || input.dataset.cartItemVariantId;
         if (variantId) configureInput(input, variantId, false);
       });
-  };
 
-  const apply = () => {
-    productForms();
-    cartInputs();
+    // Mark all /cart/add forms with their variant ID for the submit handler
+    document.querySelectorAll('form[action*="/cart/add"]').forEach((form) => {
+      const variantInput = form.querySelector('input[name="id"], select[name="id"]');
+      if (variantInput) form.dataset.minMaxVariantId = String(variantInput.value);
+    });
   };
 
   document.addEventListener(
@@ -117,9 +134,13 @@
       if (form.matches('form[action*="/cart/add"]')) {
         const variantInput = form.querySelector('input[name="id"], select[name="id"]');
         const variantId = variantInput?.value || form.dataset.minMaxVariantId;
-        const rule = variantId ? ruleFor(variantId) : null;
+        const rule = ruleFor(variantId);
         if (!rule) return;
+        // Find the quantity input — inside the form or linked via form attribute
         let quantityInput = form.querySelector('input[name="quantity"]');
+        if (!quantityInput && form.id) {
+          quantityInput = document.querySelector(`input[name="quantity"][form="${form.id}"]`);
+        }
         if (!quantityInput) {
           quantityInput = document.createElement("input");
           quantityInput.type = "hidden";
@@ -157,30 +178,8 @@
     true,
   );
 
-  document.addEventListener("change", (event) => {
-    const input = event.target;
-    if (!(input instanceof HTMLInputElement)) return;
-    const variantId = input.dataset.minMaxVariantId;
-    if (variantId) {
-      const rule = ruleFor(variantId);
-      if (rule) {
-        let quantity = Number(input.value);
-        if (!valid(quantity, rule)) {
-          const snapped = snapToValid(quantity, rule);
-          setValue(input, snapped);
-          quantity = snapped;
-        }
-        showMessage(input, rule, !valid(quantity, rule));
-      }
-    }
-    if (input.name === "id" || input.matches('select[name="id"]')) {
-      setTimeout(apply, 0);
-    }
-  });
-
-  document.addEventListener("blur", (event) => {
-    const input = event.target;
-    if (!(input instanceof HTMLInputElement)) return;
+  // Snap invalid values on change and blur
+  const handleInputCorrection = (input) => {
     const variantId = input.dataset.minMaxVariantId;
     if (!variantId) return;
     const rule = ruleFor(variantId);
@@ -192,6 +191,26 @@
       quantity = snapped;
     }
     showMessage(input, rule, !valid(quantity, rule));
+  };
+
+  document.addEventListener("change", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    if (input.name === "quantity" || input.dataset.minMaxVariantId) {
+      handleInputCorrection(input);
+    }
+    // Variant changed — re-apply to pick up new variant's rule
+    if (input.name === "id" || input.matches('select[name="id"]')) {
+      setTimeout(apply, 0);
+    }
+  });
+
+  document.addEventListener("blur", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    if (input.name === "quantity" || input.dataset.minMaxVariantId) {
+      handleInputCorrection(input);
+    }
   }, true);
 
   let timer;
@@ -202,12 +221,12 @@
   });
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => setTimeout(apply, 50), { once: true });
+    document.addEventListener("DOMContentLoaded", () => setTimeout(apply, 100), { once: true });
   } else {
-    setTimeout(apply, 50);
+    setTimeout(apply, 100);
   }
   observer.observe(document.body, { childList: true, subtree: true });
-  document.addEventListener("shopify:section:load", apply);
-  document.addEventListener("cart:updated", apply);
-  document.addEventListener("cart:refresh", apply);
+  document.addEventListener("shopify:section:load", () => setTimeout(apply, 100));
+  document.addEventListener("cart:updated", () => setTimeout(apply, 100));
+  document.addEventListener("cart:refresh", () => setTimeout(apply, 100));
 })();
