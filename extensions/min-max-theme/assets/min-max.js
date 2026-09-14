@@ -50,6 +50,12 @@
     input.setAttribute("aria-invalid", String(isError));
   };
 
+  const setValue = (input, value) => {
+    input.value = String(value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+
   const configureInput = (input, variantId, initialize) => {
     const rule = ruleFor(variantId);
     if (!rule) return;
@@ -60,7 +66,7 @@
     input.dataset.minMaxVariantId = String(variantId);
     if (initialize) {
       const quantity = Number(input.value);
-      if (!valid(quantity, rule)) input.value = String(rule.start);
+      if (!valid(quantity, rule)) setValue(input, rule.start);
     }
     showMessage(input, rule, !valid(Number(input.value), rule));
   };
@@ -154,35 +160,6 @@
       setTimeout(apply, 0);
     }
   });
-
-  document.addEventListener(
-    "click",
-    (event) => {
-      const button = event.target.closest(
-        'button[name="plus"], button[name="minus"], .quantity__button, [data-quantity-step]',
-      );
-      if (!button) return;
-      const host =
-        button.closest("quantity-input, .quantity, .product-form__quantity, .cart-item__quantity") ||
-        button.parentElement;
-      const input = host?.querySelector('input[data-min-max-variant-id], input[name="quantity"]');
-      if (!input) return;
-      const variantId = input.dataset.minMaxVariantId;
-      const rule = variantId ? ruleFor(variantId) : null;
-      if (!rule) return;
-      const isMinus =
-        button.name === "minus" ||
-        button.dataset.quantityStep === "down" ||
-        /minus|decrease|remove/i.test(button.className);
-      let next = Number(input.value) || 0;
-      next += isMinus ? -rule.increment : rule.increment;
-      next = Math.max(next, rule.minimum);
-      if (rule.maximum != null) next = Math.min(next, rule.maximum);
-      input.value = String(next);
-      showMessage(input, rule, !valid(next, rule));
-    },
-    true,
-  );
 
   let timer;
   const observer = new MutationObserver((mutations) => {
