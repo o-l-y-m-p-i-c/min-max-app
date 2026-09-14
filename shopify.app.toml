@@ -1,0 +1,54 @@
+client_id = "3825704895083862b4de767b67a6c0cd"
+name = "min-max-app"
+application_url = "https://min-max-app.onrender.com"
+embedded = true
+
+[access_scopes]
+scopes = "write_products,read_validations,write_validations,read_themes"
+optional_scopes = []
+use_legacy_install_flow = false
+
+[webhooks]
+api_version = "2026-07"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = ["app/uninstalled"]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/scopes_update"
+  topics = ["app/scopes_update"]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/products/update"
+  topics = ["products/create", "products/update"]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/products/delete"
+  topics = ["products/delete"]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/collections/update"
+  topics = ["collections/create", "collections/update"]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/collections/delete"
+  topics = ["collections/delete"]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/data_request"
+  compliance_topics = ["customers/data_request"]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/redact"
+  compliance_topics = ["customers/redact"]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/shop/redact"
+  compliance_topics = ["shop/redact"]
+
+[auth]
+redirect_urls = ["https://min-max-app.onrender.com/auth/callback"]
+
+[pos]
+embedded = false

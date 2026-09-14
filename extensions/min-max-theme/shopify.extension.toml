@@ -1,0 +1,5 @@
+api_version = "2026-07"
+name = "t:name"
+description = "t:description"
+type = "theme_app_extension"
+uid = "e6ac3b51-c2ee-2878-45fe-ca2c1bbd1bfc1a25c241"

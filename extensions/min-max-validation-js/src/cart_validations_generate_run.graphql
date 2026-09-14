@@ -1,0 +1,30 @@
+query CartValidationsGenerateRunInput {
+  localization {
+    language {
+      isoCode
+    }
+  }
+  cart {
+    lines {
+      id
+      quantity
+      merchandise {
+        __typename
+        ... on ProductVariant {
+          id
+          metafield(namespace: "$app:min-max", key: "effective-rule") {
+            value
+          }
+          product {
+            title
+          }
+        }
+      }
+    }
+  }
+  validation {
+    metafield(namespace: "$app:min-max", key: "configuration") {
+      value
+    }
+  }
+}

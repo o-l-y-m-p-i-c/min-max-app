@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RuleScope {
+  ALL_PRODUCTS
+  PRODUCTS
+  VARIANTS
+  COLLECTIONS
+  PRODUCT_TAGS
+}
+
+enum SyncStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  ERROR
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+
+  @@index([shop])
+}
+
+model ShopSettings {
+  id                  String    @id @default(cuid())
+  shop                String    @unique
+  enabled             Boolean   @default(true)
+  validationId        String?
+  blockOnFailure      Boolean   @default(false)
+  storefrontEnabled   Boolean   @default(true)
+  lastSyncedAt        DateTime?
+  lastSyncError       String?
+  configurationVersion Int      @default(1)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  rules       Rule[]
+  compiled    CompiledVariant[]
+  syncLogs    SyncLog[]
+}
+
+model Rule {
+  id              String      @id @default(cuid())
+  shop            String
+  name            String
+  enabled         Boolean     @default(true)
+  scope           RuleScope
+  priority        Int         @default(0)
+  minQuantity     Int         @default(1)
+  maxQuantity     Int?
+  increment       Int         @default(1)
+  startQuantity   Int?
+  messageEn       String?
+  messageLv       String?
+  messageRu       String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  settings        ShopSettings @relation(fields: [shop], references: [shop], onDelete: Cascade)
+  targets         RuleTarget[]
+  compiledVariants CompiledVariant[]
+
+  @@index([shop, enabled])
+  @@index([shop, scope, priority])
+}
+
+model RuleTarget {
+  id          String   @id @default(cuid())
+  ruleId      String
+  resourceId  String?
+  value       String?
+  label       String
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+
+  rule Rule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId])
+  @@unique([ruleId, resourceId, value])
+}
+
+model CompiledVariant {
+  id          String   @id @default(cuid())
+  shop        String
+  variantId   String
+  productId   String
+  productTitle String
+  variantTitle String
+  ruleId      String
+  revision    Int
+  syncedAt    DateTime @default(now())
+
+  settings ShopSettings @relation(fields: [shop], references: [shop], onDelete: Cascade)
+  rule     Rule         @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([shop, variantId])
+  @@index([shop, ruleId])
+}
+
+model SyncLog {
+  id        String     @id @default(cuid())
+  shop      String
+  status    SyncStatus
+  operation String
+  message   String
+  details   Json?
+  createdAt DateTime   @default(now())
+
+  settings ShopSettings @relation(fields: [shop], references: [shop], onDelete: Cascade)
+
+  @@index([shop, createdAt])
+}

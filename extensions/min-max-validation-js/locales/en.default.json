@@ -1,0 +1,4 @@
+{
+  "name": "Min Max Order Limits",
+  "description": "Enforces minimum, maximum, and pack-size quantity rules."
+}
