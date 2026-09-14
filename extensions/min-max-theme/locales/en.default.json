@@ -1,0 +1,4 @@
+{
+  "name": "Min Max Quantity Controls",
+  "description": "Enforces minimum, maximum, and pack-size quantity rules on product pages and in the cart."
+}

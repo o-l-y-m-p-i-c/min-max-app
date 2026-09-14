@@ -1,0 +1,15 @@
+.min-max-message {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.875em;
+  color: rgba(var(--color-foreground, 18, 18, 18), 0.7);
+}
+
+.min-max-message--error {
+  color: rgb(185, 28, 28);
+}
+
+.min-max-invalid {
+  outline: 2px solid rgb(185, 28, 28);
+  outline-offset: 2px;
+}

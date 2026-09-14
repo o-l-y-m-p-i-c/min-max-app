@@ -1,0 +1,18 @@
+{%- assign min_max_config = app.metafields["$app:min-max"]["storefront-configuration"].value -%}
+<script type="application/json" data-min-max-configuration>
+  {%- if min_max_config -%}
+    {{ min_max_config | json }}
+  {%- else -%}
+    {"version":1,"enabled":false,"rules":{}}
+  {%- endif -%}
+</script>
+<script src="{{ 'min-max.js' | asset_url }}" defer="defer"></script>
+{{ 'min-max.css' | asset_url | stylesheet_tag }}
+
+{% schema %}
+{
+  "name": "Min Max Quantity Controls",
+  "target": "body",
+  "settings": []
+}
+{% endschema %}
