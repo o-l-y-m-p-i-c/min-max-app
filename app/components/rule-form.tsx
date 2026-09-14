@@ -311,10 +311,10 @@ export function RuleForm({
             </s-stack>
           </s-section>
 
-          <s-button-group>
+          <s-stack direction="inline" gap="base">
             <s-button type="submit" variant="primary" loading={busy}>Save and sync</s-button>
             <s-button href="/app">Cancel</s-button>
-          </s-button-group>
+          </s-stack>
         </s-stack>
       </Form>
     </s-page>

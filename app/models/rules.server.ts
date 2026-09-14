@@ -59,7 +59,6 @@ export function validateRuleInput(input: RuleInput) {
 }
 
 export async function listRules(shop: string) {
-  await getSettings(shop);
   return prisma.rule.findMany({
     where: { shop },
     include: { targets: true, _count: { select: { compiledVariants: true } } },
