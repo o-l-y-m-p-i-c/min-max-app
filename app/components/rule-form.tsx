@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useRef, useState } from "react";
 import { Form, useNavigation } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 
@@ -11,7 +11,6 @@ export type RuleFormTarget = {
 
 export type RuleFormValue = {
   id?: string;
-  name: string;
   enabled: boolean;
   scope: "ALL_PRODUCTS" | "PRODUCTS" | "VARIANTS" | "COLLECTIONS" | "PRODUCT_TAGS";
   priority: number;
@@ -43,29 +42,48 @@ export function RuleForm({
 }) {
   const shopify = useAppBridge();
   const navigation = useNavigation();
-  const [value, setValue] = useState(initialValue);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [scope, setScope] = useState(initialValue.scope);
+  const [enabled, setEnabled] = useState(initialValue.enabled);
+  const [targets, setTargets] = useState(initialValue.targets);
   const [tagInput, setTagInput] = useState(
     initialValue.scope === "PRODUCT_TAGS"
       ? initialValue.targets.map((target) => target.value).filter(Boolean).join(", ")
       : "",
   );
+  const [examples, setExamples] = useState(() => {
+    const start =
+      initialValue.startQuantity ||
+      Math.ceil(initialValue.minQuantity / initialValue.increment) * initialValue.increment;
+    return Array.from({ length: 4 }, (_, index) => start + index * initialValue.increment).filter(
+      (quantity) =>
+        initialValue.maxQuantity === null || quantity <= initialValue.maxQuantity,
+    );
+  });
   const busy = navigation.state !== "idle";
 
-  const startQuantity = useMemo(
-    () =>
-      value.startQuantity ||
-      Math.ceil(value.minQuantity / value.increment) * value.increment,
-    [value.increment, value.minQuantity, value.startQuantity],
-  );
-  const examples = Array.from({ length: 4 }, (_, index) =>
-    startQuantity + index * value.increment,
-  ).filter((quantity) => value.maxQuantity === null || quantity <= value.maxQuantity);
+  const updateExamples = () => {
+    const form = formRef.current;
+    if (!form) return;
+    const min = Number(form.querySelector('[name="minQuantity"]')?.getAttribute("value") || 6);
+    const max = form.querySelector('[name="maxQuantity"]')?.getAttribute("value");
+    const step = Number(form.querySelector('[name="increment"]')?.getAttribute("value") || 1);
+    const start = form.querySelector('[name="startQuantity"]')?.getAttribute("value");
+    const maxNum = max ? Number(max) : null;
+    const startNum = start
+      ? Number(start)
+      : Math.ceil(min / step) * step;
+    const next = Array.from({ length: 4 }, (_, index) => startNum + index * step).filter(
+      (quantity) => maxNum === null || quantity <= maxNum,
+    );
+    setExamples(next);
+  };
 
   const chooseTargets = async () => {
     const type =
-      value.scope === "COLLECTIONS"
+      scope === "COLLECTIONS"
         ? "collection"
-        : value.scope === "VARIANTS"
+        : scope === "VARIANTS"
           ? "variant"
           : "product";
     const selected = (await shopify.resourcePicker({
@@ -73,14 +91,13 @@ export function RuleForm({
       multiple: true,
       action: "select",
       filter: type === "product" ? { variants: false } : undefined,
-      selectionIds: value.targets.flatMap((target) =>
+      selectionIds: targets.flatMap((target) =>
         target.resourceId ? [{ id: target.resourceId }] : [],
       ),
     })) as PickerSelection[] | undefined;
     if (!selected) return;
-    setValue((current) => ({
-      ...current,
-      targets: selected.map((item) => ({
+    setTargets(
+      selected.map((item) => ({
         resourceId: item.id,
         label:
           item.displayName ||
@@ -92,59 +109,42 @@ export function RuleForm({
           item.images?.[0]?.originalSrc ||
           item.images?.[0]?.url,
       })),
-    }));
+    );
   };
 
   const normalizedTargets =
-    value.scope === "PRODUCT_TAGS"
+    scope === "PRODUCT_TAGS"
       ? tagInput
           .split(",")
           .map((tag) => tag.trim())
           .filter(Boolean)
           .map((tag) => ({ value: tag, label: tag }))
-      : value.targets;
+      : targets;
 
   return (
-    <s-page heading={value.id ? "Edit quantity rule" : "Create quantity rule"}>
+    <s-page heading={initialValue.id ? "Edit quantity rule" : "Create quantity rule"}>
       <s-button slot="secondary-actions" href="/app">Cancel</s-button>
       {error ? <s-banner heading="Unable to save rule" tone="critical">{error}</s-banner> : null}
 
-      <Form method="post">
+      <Form method="post" ref={formRef}>
         <input type="hidden" name="targets" value={JSON.stringify(normalizedTargets)} />
-        <input type="hidden" name="enabled" value={String(value.enabled)} />
+        <input type="hidden" name="enabled" value={String(enabled)} />
         <s-stack direction="block" gap="base">
           <s-section heading="Rule details">
             <s-stack direction="block" gap="base">
-              <s-text-field
-                name="name"
-                label="Rule name"
-                value={value.name}
-                onChange={(event) =>
-                  setValue((current) => ({ ...current, name: event.currentTarget.value }))
-                }
-                required
-              ></s-text-field>
               <s-switch
                 label="Rule enabled"
                 name="enabledSwitch"
-                checked={value.enabled}
-                onChange={(event) =>
-                  setValue((current) => ({ ...current, enabled: event.currentTarget.checked }))
-                }
+                checked={enabled}
+                onChange={(event) => setEnabled(event.currentTarget.checked)}
               ></s-switch>
               <s-number-field
                 name="priority"
                 label="Priority"
                 details="Higher priority wins between rules with the same scope."
-                value={String(value.priority)}
+                defaultValue={String(initialValue.priority)}
                 min={0}
                 step={1}
-                onChange={(event) =>
-                  setValue((current) => ({
-                    ...current,
-                    priority: Number(event.currentTarget.value) || 0,
-                  }))
-                }
               ></s-number-field>
             </s-stack>
           </s-section>
@@ -154,10 +154,11 @@ export function RuleForm({
               <s-select
                 name="scope"
                 label="Scope"
-                value={value.scope}
+                value={scope}
                 onChange={(event) => {
-                  const scope = event.currentTarget.value as RuleFormValue["scope"];
-                  setValue((current) => ({ ...current, scope, targets: [] }));
+                  const value = event.currentTarget.value;
+                  setScope(value as typeof scope);
+                  setTargets([]);
                   setTagInput("");
                 }}
               >
@@ -168,31 +169,30 @@ export function RuleForm({
                 <s-option value="ALL_PRODUCTS">All products</s-option>
               </s-select>
 
-              {value.scope === "PRODUCT_TAGS" ? (
+              {scope === "PRODUCT_TAGS" ? (
                 <s-text-field
                   label="Product tags"
                   details="Separate multiple tags with commas."
-                  value={tagInput}
-                  onChange={(event) => setTagInput(event.currentTarget.value)}
+                  defaultValue={tagInput}
+                  onInput={(event) => setTagInput(event.currentTarget.value)}
                   required
                 ></s-text-field>
-              ) : value.scope !== "ALL_PRODUCTS" ? (
+              ) : scope !== "ALL_PRODUCTS" ? (
                 <s-stack direction="block" gap="base">
                   <s-button onClick={chooseTargets}>Select resources</s-button>
-                  {value.targets.length ? (
+                  {targets.length ? (
                     <s-stack direction="inline" gap="small-200">
-                      {value.targets.map((target) => (
+                      {targets.map((target) => (
                         <s-clickable-chip
                           key={target.resourceId || target.value}
                           removable
                           accessibilityLabel={`Remove ${target.label}`}
                           onRemove={() =>
-                            setValue((current) => ({
-                              ...current,
-                              targets: current.targets.filter(
+                            setTargets((current) =>
+                              current.filter(
                                 (item) => item.resourceId !== target.resourceId,
                               ),
-                            }))
+                            )
                           }
                         >
                           {target.label}
@@ -216,62 +216,38 @@ export function RuleForm({
               <s-number-field
                 name="minQuantity"
                 label="Minimum quantity"
-                value={String(value.minQuantity)}
+                defaultValue={String(initialValue.minQuantity)}
                 min={1}
                 step={1}
                 required
-                onChange={(event) =>
-                  setValue((current) => ({
-                    ...current,
-                    minQuantity: Math.max(1, Number(event.currentTarget.value) || 1),
-                  }))
-                }
+                onInput={updateExamples}
               ></s-number-field>
               <s-number-field
                 name="maxQuantity"
                 label="Maximum quantity"
                 details="Leave empty for no maximum."
-                value={value.maxQuantity === null ? "" : String(value.maxQuantity)}
+                defaultValue={initialValue.maxQuantity === null ? "" : String(initialValue.maxQuantity)}
                 min={1}
                 step={1}
-                onChange={(event) =>
-                  setValue((current) => ({
-                    ...current,
-                    maxQuantity: event.currentTarget.value
-                      ? Number(event.currentTarget.value)
-                      : null,
-                  }))
-                }
+                onInput={updateExamples}
               ></s-number-field>
               <s-number-field
                 name="increment"
                 label="Quantity increment / pack size"
-                value={String(value.increment)}
+                defaultValue={String(initialValue.increment)}
                 min={1}
                 step={1}
                 required
-                onChange={(event) =>
-                  setValue((current) => ({
-                    ...current,
-                    increment: Math.max(1, Number(event.currentTarget.value) || 1),
-                  }))
-                }
+                onInput={updateExamples}
               ></s-number-field>
               <s-number-field
                 name="startQuantity"
                 label="Starting quantity"
                 details="Optional storefront default; normally calculated automatically."
-                value={value.startQuantity === null ? "" : String(value.startQuantity)}
+                defaultValue={initialValue.startQuantity === null ? "" : String(initialValue.startQuantity)}
                 min={1}
                 step={1}
-                onChange={(event) =>
-                  setValue((current) => ({
-                    ...current,
-                    startQuantity: event.currentTarget.value
-                      ? Number(event.currentTarget.value)
-                      : null,
-                  }))
-                }
+                onInput={updateExamples}
               ></s-number-field>
             </s-grid>
             <s-paragraph>
@@ -284,29 +260,20 @@ export function RuleForm({
               <s-text-field
                 name="messageEn"
                 label="English"
-                value={value.messageEn}
+                defaultValue={initialValue.messageEn}
                 placeholder="Optional custom message"
-                onChange={(event) =>
-                  setValue((current) => ({ ...current, messageEn: event.currentTarget.value }))
-                }
               ></s-text-field>
               <s-text-field
                 name="messageLv"
                 label="Latvian"
-                value={value.messageLv}
+                defaultValue={initialValue.messageLv}
                 placeholder="Optional custom message"
-                onChange={(event) =>
-                  setValue((current) => ({ ...current, messageLv: event.currentTarget.value }))
-                }
               ></s-text-field>
               <s-text-field
                 name="messageRu"
                 label="Russian"
-                value={value.messageRu}
+                defaultValue={initialValue.messageRu}
                 placeholder="Optional custom message"
-                onChange={(event) =>
-                  setValue((current) => ({ ...current, messageRu: event.currentTarget.value }))
-                }
               ></s-text-field>
             </s-stack>
           </s-section>

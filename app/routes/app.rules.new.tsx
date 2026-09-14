@@ -7,7 +7,6 @@ import { saveRule } from "../models/rules.server";
 import { syncShop } from "../lib/min-max.server";
 
 const initialValue: RuleFormValue = {
-  name: "",
   enabled: true,
   scope: "PRODUCTS",
   priority: 0,

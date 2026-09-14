@@ -20,6 +20,22 @@ function optionalInteger(value: FormDataEntryValue | null) {
   return Number.isInteger(parsed) ? parsed : null;
 }
 
+const scopeLabels: Record<RuleScope, string> = {
+  ALL_PRODUCTS: "All products",
+  PRODUCTS: "Products",
+  VARIANTS: "Variants",
+  COLLECTIONS: "Collections",
+  PRODUCT_TAGS: "Product tags",
+};
+
+function generateRuleName(scope: RuleScope, minQuantity: number, increment: number, maxQuantity: number | null): string {
+  const parts = [`Pack of ${increment}`, scopeLabels[scope]];
+  const limits = [`min ${minQuantity}`];
+  if (maxQuantity !== null) limits.push(`max ${maxQuantity}`);
+  if (increment !== 1) limits.push(`step ${increment}`);
+  return `${parts.join(" · ")} (${limits.join(", ")})`;
+}
+
 export function parseRuleForm(data: FormData): RuleInput {
   const scopeValue = String(data.get("scope") || "PRODUCTS") as RuleScope;
   if (!scopes.has(scopeValue)) throw new Error("Invalid rule scope");
@@ -41,14 +57,18 @@ export function parseRuleForm(data: FormData): RuleInput {
     throw new Error("Invalid rule targets");
   }
 
+  const minQuantity = integer(data.get("minQuantity"), 1);
+  const maxQuantity = optionalInteger(data.get("maxQuantity"));
+  const increment = integer(data.get("increment"), 1);
+
   return {
-    name: String(data.get("name") || "").slice(0, 255),
+    name: generateRuleName(scopeValue, minQuantity, increment, maxQuantity),
     enabled: data.get("enabled") === "true",
     scope: scopeValue,
     priority: integer(data.get("priority"), 0),
-    minQuantity: integer(data.get("minQuantity"), 1),
-    maxQuantity: optionalInteger(data.get("maxQuantity")),
-    increment: integer(data.get("increment"), 1),
+    minQuantity,
+    maxQuantity,
+    increment,
     startQuantity: optionalInteger(data.get("startQuantity")),
     messageEn: String(data.get("messageEn") || "").slice(0, 500) || null,
     messageLv: String(data.get("messageLv") || "").slice(0, 500) || null,

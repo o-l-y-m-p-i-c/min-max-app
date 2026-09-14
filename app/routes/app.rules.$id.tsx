@@ -31,7 +31,6 @@ export default function EditRule() {
   const actionData = useActionData<typeof action>();
   const initialValue: RuleFormValue = {
     id: rule.id,
-    name: rule.name,
     enabled: rule.enabled,
     scope: rule.scope,
     priority: rule.priority,

@@ -26,7 +26,6 @@ export type RuleInput = {
 
 export function validateRuleInput(input: RuleInput) {
   const errors: string[] = [];
-  if (!input.name.trim()) errors.push("Rule name is required");
   if (!Number.isInteger(input.minQuantity) || input.minQuantity < 1) {
     errors.push("Minimum quantity must be a positive integer");
   }
