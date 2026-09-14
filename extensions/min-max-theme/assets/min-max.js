@@ -50,6 +50,15 @@
     input.setAttribute("aria-invalid", String(isError));
   };
 
+  const snapToValid = (quantity, rule) => {
+    if (quantity < rule.minimum) return rule.start;
+    if (rule.maximum != null && quantity > rule.maximum) return rule.maximum;
+    const remainder = quantity % rule.increment;
+    if (remainder === 0) return quantity;
+    const snapped = quantity - remainder;
+    return snapped >= rule.minimum ? snapped : rule.start;
+  };
+
   const setValue = (input, value) => {
     input.value = String(value);
     input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -154,12 +163,36 @@
     const variantId = input.dataset.minMaxVariantId;
     if (variantId) {
       const rule = ruleFor(variantId);
-      if (rule) showMessage(input, rule, !valid(Number(input.value), rule));
+      if (rule) {
+        let quantity = Number(input.value);
+        if (!valid(quantity, rule)) {
+          const snapped = snapToValid(quantity, rule);
+          setValue(input, snapped);
+          quantity = snapped;
+        }
+        showMessage(input, rule, !valid(quantity, rule));
+      }
     }
     if (input.name === "id" || input.matches('select[name="id"]')) {
       setTimeout(apply, 0);
     }
   });
+
+  document.addEventListener("blur", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    const variantId = input.dataset.minMaxVariantId;
+    if (!variantId) return;
+    const rule = ruleFor(variantId);
+    if (!rule) return;
+    let quantity = Number(input.value);
+    if (!valid(quantity, rule)) {
+      const snapped = snapToValid(quantity, rule);
+      setValue(input, snapped);
+      quantity = snapped;
+    }
+    showMessage(input, rule, !valid(quantity, rule));
+  }, true);
 
   let timer;
   const observer = new MutationObserver((mutations) => {
@@ -169,9 +202,9 @@
   });
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", apply, { once: true });
+    document.addEventListener("DOMContentLoaded", () => setTimeout(apply, 50), { once: true });
   } else {
-    apply();
+    setTimeout(apply, 50);
   }
   observer.observe(document.body, { childList: true, subtree: true });
   document.addEventListener("shopify:section:load", apply);
