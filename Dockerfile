@@ -21,4 +21,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -
 COPY --from=build /app /app
 
 EXPOSE 3000
-CMD ["npm", "run", "docker-start"]
+CMD ["sh", "-c", "export DIRECT_DATABASE_URL=$(echo $DATABASE_URL | sed 's/-pooler//') && npm run docker-start"]
