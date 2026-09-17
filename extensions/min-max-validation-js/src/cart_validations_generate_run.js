@@ -5,7 +5,7 @@
  * @typedef {import("../generated/api").CartValidationsGenerateRunResult} CartValidationsGenerateRunResult
  */
 
-/** @typedef {{ minimum: number, maximum: number | null, increment: number, customMessages?: Record<string, string> }} Rule */
+/** @typedef {{ minimum: number, maximum: number | null, increment: number, count?: number, customMessages?: Record<string, string> }} Rule */
 /** @typedef {{ version: number, enabled: boolean, messages?: Record<string, Record<string, string>> }} Configuration */
 /** @typedef {"minimum" | "maximum" | "multiple" | null} ViolationKind */
 
@@ -28,14 +28,16 @@ const parse = (value) => {
  * @param {string} template
  * @param {string} product
  * @param {Rule} rule
+ * @param {number} count
  * @returns {string}
  */
-const render = (template, product, rule) =>
+const render = (template, product, rule, count) =>
   template
     .replaceAll("{{product}}", product)
     .replaceAll("{{minimum}}", String(rule.minimum))
     .replaceAll("{{maximum}}", String(rule.maximum ?? ""))
-    .replaceAll("{{increment}}", String(rule.increment));
+    .replaceAll("{{increment}}", String(rule.increment))
+    .replaceAll("{{count}}", String(count));
 
 /**
  * @param {number} quantity
@@ -69,8 +71,9 @@ export function cartValidationsGenerateRun(input) {
     const kind = violation(line.quantity, rule);
     if (!kind) continue;
     const template = rule.customMessages?.[locale] || defaults[kind] || FALLBACK;
+    const count = rule.count ?? 0;
     errors.push({
-      message: render(template, line.merchandise.product.title, rule),
+      message: render(template, line.merchandise.product.title, rule, count),
       target: "$.cart",
     });
   }

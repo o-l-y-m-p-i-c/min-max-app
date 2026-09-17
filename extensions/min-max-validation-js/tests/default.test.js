@@ -11,7 +11,7 @@ const input = (quantity) => ({
           en: {
             minimum: "{{product}} requires at least {{minimum}} items.",
             maximum: "{{product}} allows at most {{maximum}} items.",
-            multiple: "{{product}} is sold in multiples of {{increment}}.",
+            multiple: "{{product}} is sold in multiples of {{increment}}. In inventory is available {{count}}.",
           },
         },
       }),
@@ -31,6 +31,7 @@ const input = (quantity) => ({
               minimum: 6,
               maximum: 24,
               increment: 6,
+              count: 48,
               customMessages: {},
             }),
           },
@@ -57,7 +58,7 @@ describe("min/max validation", () => {
 
   test("rejects invalid multiple", () => {
     expect(cartValidationsGenerateRun(input(7)).operations[0].validationAdd.errors[0].message)
-      .toBe("Water is sold in multiples of 6.");
+      .toBe("Water is sold in multiples of 6. In inventory is available 48.");
   });
 
   test("renders custom localized message", () => {
