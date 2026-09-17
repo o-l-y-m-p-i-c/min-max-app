@@ -23,6 +23,7 @@ type VariantRecord = {
   title: string;
   productId: string;
   productTitle: string;
+  inventoryQuantity: number;
 };
 
 type EffectiveRule = {
@@ -32,6 +33,7 @@ type EffectiveRule = {
   maximum: number | null;
   increment: number;
   start: number;
+  count: number;
   customMessages: Record<string, string>;
 };
 
@@ -39,17 +41,17 @@ const DEFAULT_MESSAGES = {
   en: {
     minimum: "{{product}} requires at least {{minimum}} items.",
     maximum: "{{product}} allows at most {{maximum}} items.",
-    multiple: "{{product}} is sold in multiples of {{increment}}.",
+    multiple: "{{product}} is sold in multiples of {{increment}}. In inventory is available {{count}}.",
   },
   lv: {
     minimum: "Produktam {{product}} nepieciešamas vismaz {{minimum}} vienības.",
     maximum: "Produktam {{product}} atļautas ne vairāk kā {{maximum}} vienības.",
-    multiple: "Produkts {{product}} tiek pārdots pa {{increment}} vienībām.",
+    multiple: "Produkts {{product}} tiek pārdots pa {{increment}} vienībām. Krājumā pieejamas {{count}} vienības.",
   },
   ru: {
     minimum: "Для товара {{product}} требуется минимум {{minimum}} шт.",
     maximum: "Для товара {{product}} разрешено максимум {{maximum}} шт.",
-    multiple: "Товар {{product}} продаётся кратно {{increment}} шт.",
+    multiple: "Товар {{product}} продаётся кратно {{increment}} шт. В наличии {{count}} шт.",
   },
 };
 
@@ -264,13 +266,14 @@ function sortRules(rules: RuleWithTargets[]) {
 function productVariants(product: {
   id: string;
   title: string;
-  variants: { nodes: Array<{ id: string; title: string }> };
+  variants: { nodes: Array<{ id: string; title: string; inventoryQuantity: number }> };
 }) {
   return product.variants.nodes.map((variant) => ({
     id: variant.id,
     title: variant.title,
     productId: product.id,
     productTitle: product.title,
+    inventoryQuantity: variant.inventoryQuantity ?? 0,
   }));
 }
 
@@ -286,7 +289,7 @@ async function fetchProducts(
         nodes: Array<{
           id: string;
           title: string;
-          variants: { nodes: Array<{ id: string; title: string }> };
+          variants: { nodes: Array<{ id: string; title: string; inventoryQuantity: number }> };
         }>;
         pageInfo: { hasNextPage: boolean; endCursor: string | null };
       };
@@ -298,7 +301,7 @@ async function fetchProducts(
             nodes {
               id
               title
-              variants(first: 250) { nodes { id title } }
+              variants(first: 250) { nodes { id title inventoryQuantity } }
             }
             pageInfo { hasNextPage endCursor }
           }
@@ -346,7 +349,7 @@ async function variantsForRule(admin: AdminClient, rule: RuleWithTargets) {
               nodes: Array<{
                 id: string;
                 title: string;
-                variants: { nodes: Array<{ id: string; title: string }> };
+                variants: { nodes: Array<{ id: string; title: string; inventoryQuantity: number }> };
               }>;
               pageInfo: { hasNextPage: boolean; endCursor: string | null };
             };
@@ -360,7 +363,7 @@ async function variantsForRule(admin: AdminClient, rule: RuleWithTargets) {
                   nodes {
                     id
                     title
-                    variants(first: 250) { nodes { id title } }
+                    variants(first: 250) { nodes { id title inventoryQuantity } }
                   }
                   pageInfo { hasNextPage endCursor }
                 }
@@ -389,12 +392,13 @@ async function variantsForRule(admin: AdminClient, rule: RuleWithTargets) {
           __typename: "Product";
           id: string;
           title: string;
-          variants: { nodes: Array<{ id: string; title: string }> };
+          variants: { nodes: Array<{ id: string; title: string; inventoryQuantity: number }> };
         }
         | {
           __typename: "ProductVariant";
           id: string;
           title: string;
+          inventoryQuantity: number;
           product: { id: string; title: string };
         }
         | null
@@ -408,11 +412,12 @@ async function variantsForRule(admin: AdminClient, rule: RuleWithTargets) {
             ... on Product {
               id
               title
-              variants(first: 250) { nodes { id title } }
+              variants(first: 250) { nodes { id title inventoryQuantity } }
             }
             ... on ProductVariant {
               id
               title
+              inventoryQuantity
               product { id title }
             }
           }
@@ -429,6 +434,7 @@ async function variantsForRule(admin: AdminClient, rule: RuleWithTargets) {
           title: node.title,
           productId: node.product.id,
           productTitle: node.product.title,
+          inventoryQuantity: node.inventoryQuantity ?? 0,
         });
       }
     }
@@ -436,7 +442,7 @@ async function variantsForRule(admin: AdminClient, rule: RuleWithTargets) {
   return output;
 }
 
-function effectiveRule(rule: RuleWithTargets): EffectiveRule {
+function effectiveRule(rule: RuleWithTargets, variant: VariantRecord): EffectiveRule {
   const start =
     rule.startQuantity || Math.ceil(rule.minQuantity / rule.increment) * rule.increment;
   return {
@@ -446,6 +452,7 @@ function effectiveRule(rule: RuleWithTargets): EffectiveRule {
     maximum: rule.maxQuantity,
     increment: rule.increment,
     start,
+    count: variant.inventoryQuantity,
     customMessages: {
       ...(rule.messageEn ? { en: rule.messageEn } : {}),
       ...(rule.messageLv ? { lv: rule.messageLv } : {}),
@@ -464,7 +471,7 @@ async function setVariantMetafields(
       namespace: NAMESPACE,
       key: EFFECTIVE_RULE_KEY,
       type: "json",
-      value: JSON.stringify(effectiveRule(rule)),
+      value: JSON.stringify(effectiveRule(rule, variant)),
     }));
     const data = await graphql<{
       metafieldsSet: { userErrors: Array<{ message: string }> };
@@ -532,7 +539,7 @@ async function setStorefrontConfiguration(
   const rules = Object.fromEntries(
     assignments.map(({ variant, rule }) => [
       variant.id.split("/").pop(),
-      effectiveRule(rule),
+      effectiveRule(rule, variant),
     ]),
   );
   const data = await graphql<{
