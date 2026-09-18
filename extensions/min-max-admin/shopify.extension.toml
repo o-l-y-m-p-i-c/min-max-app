@@ -1,0 +1,14 @@
+api_version = "2025-07"
+
+[[extensions]]
+type = "ui_extension"
+name = "Min/Max product rule"
+handle = "min-max-admin"
+
+[[extensions.targeting]]
+module = "./src/ProductRuleExtension.jsx"
+target = "admin.product-details.block.render"
+
+[[extensions.targeting]]
+module = "./src/ProductRuleExtension.jsx"
+target = "admin.product-details.action.render"

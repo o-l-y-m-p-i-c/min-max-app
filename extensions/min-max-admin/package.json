@@ -1,0 +1,11 @@
+{
+  "name": "min-max-admin",
+  "version": "1.0.0",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@shopify/ui-extensions": "2025.7.x",
+    "@shopify/ui-extensions-react": "2025.7.x",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  }
+}
