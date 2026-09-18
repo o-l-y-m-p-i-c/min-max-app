@@ -1,0 +1,11 @@
+api_version = "2025-07"
+
+[[extensions]]
+type = "ui_extension"
+name = "Min/Max product rule"
+handle = "min-max-admin-block"
+uid = "b0718e8a-c158-5e3c-f9f8-6a93bf62172a4aab84be"
+
+[[extensions.targeting]]
+module = "./src/ProductRuleBlock.jsx"
+target = "admin.product-details.block.render"

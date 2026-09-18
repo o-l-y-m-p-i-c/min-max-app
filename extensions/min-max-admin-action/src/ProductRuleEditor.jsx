@@ -1,22 +1,16 @@
 import {useCallback, useEffect, useState} from 'react';
 import {
-  render,
-  useApi,
-  AdminAction,
-  AdminBlock,
   Banner,
   BlockStack,
   Button,
   Checkbox,
   InlineStack,
-  InlineSpinner,
   NumberField,
+  ProgressIndicator,
   Text,
 } from '@shopify/ui-extensions-react/admin';
 
-const APP_URL = 'https://min-max-app.onrender.com';
-const BLOCK_TARGET = 'admin.product-details.block.render';
-const ACTION_TARGET = 'admin.product-details.action.render';
+export const APP_URL = 'https://min-max-app.onrender.com';
 
 async function apiFetch(api, path, options = {}) {
   const token = await api.sessionToken.getSessionToken();
@@ -38,20 +32,22 @@ function toNumber(v) {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
 }
 
-function ProductRuleEditor({api, onDone}) {
+const EMPTY_FORM = {
+  enabled: true,
+  minQuantity: '',
+  maxQuantity: '',
+  increment: '',
+  startQuantity: '',
+};
+
+export function ProductRuleEditor({api, onDone}) {
   const productId = api.data?.selected?.[0]?.id;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [exists, setExists] = useState(false);
-  const [form, setForm] = useState({
-    enabled: true,
-    minQuantity: '',
-    maxQuantity: '',
-    increment: '',
-    startQuantity: '',
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
 
   const set = (key) => (value) => setForm((f) => ({...f, [key]: value}));
 
@@ -111,13 +107,7 @@ function ProductRuleEditor({api, onDone}) {
         body: JSON.stringify({productId, remove: true}),
       });
       setExists(false);
-      setForm({
-        enabled: true,
-        minQuantity: '',
-        maxQuantity: '',
-        increment: '',
-        startQuantity: '',
-      });
+      setForm(EMPTY_FORM);
       try {
         api.showToast?.('Min/Max rule removed');
       } catch (e) {}
@@ -130,7 +120,7 @@ function ProductRuleEditor({api, onDone}) {
   }, [api, productId, onDone]);
 
   if (!productId) return <Text>No product selected.</Text>;
-  if (loading) return <InlineSpinner />;
+  if (loading) return <ProgressIndicator />;
 
   return (
     <BlockStack gap="base">
@@ -179,29 +169,3 @@ function ProductRuleEditor({api, onDone}) {
     </BlockStack>
   );
 }
-
-function ProductRuleBlock() {
-  const api = useApi(BLOCK_TARGET);
-  return (
-    <AdminBlock title="Min/Max quantity rule" summary="Limits for this product">
-      <ProductRuleEditor api={api} />
-    </AdminBlock>
-  );
-}
-
-function ProductRuleAction() {
-  const api = useApi(ACTION_TARGET);
-  const close = useCallback(() => api.close(), [api]);
-  return (
-    <AdminAction
-      title="Min/Max quantity rule"
-      primaryAction={null}
-      secondaryAction={<Button onPress={close}>Close</Button>}
-    >
-      <ProductRuleEditor api={api} onDone={close} />
-    </AdminAction>
-  );
-}
-
-render(BLOCK_TARGET, () => <ProductRuleBlock />);
-render(ACTION_TARGET, () => <ProductRuleAction />);
