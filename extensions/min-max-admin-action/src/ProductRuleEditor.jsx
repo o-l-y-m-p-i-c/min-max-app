@@ -13,7 +13,7 @@ import {
 export const APP_URL = 'https://min-max-app.onrender.com';
 
 async function apiFetch(api, path, options = {}) {
-  const token = await api.sessionToken.getSessionToken();
+  const token = await api.auth.idToken();
   const res = await fetch(`${APP_URL}${path}`, {
     ...options,
     headers: {
